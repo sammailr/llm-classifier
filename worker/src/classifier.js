@@ -209,20 +209,37 @@ export async function classifyWebsite({ website_id, batch_id, url, prompt_id }) 
 }
 
 async function updateBatchProgress(batch_id) {
-  // Get counts
+  // Get batch to check actual total_count
+  const { data: batch } = await supabase
+    .from('batches')
+    .select('total_count')
+    .eq('id', batch_id)
+    .single();
+
+  if (!batch) {
+    console.error(`Batch ${batch_id} not found`);
+    return;
+  }
+
+  // Get website counts
   const { data: websites } = await supabase
     .from('websites')
     .select('status')
     .eq('batch_id', batch_id);
 
-  const total = websites.length;
   const completed = websites.filter(w => w.status === 'completed').length;
   const failed = websites.filter(w => w.status === 'failed').length;
   const processing = websites.filter(w => w.status === 'processing').length;
+  const actualTotal = websites.length;
 
+  // Use the batch's total_count (claimed) not the actual DB count
+  // This ensures we mark as complete only when we've processed everything we claimed to create
   let status = 'processing';
-  if (completed + failed === total) {
+  if (completed + failed === batch.total_count) {
     status = 'completed';
+  } else if (actualTotal < batch.total_count) {
+    // Some websites weren't inserted - batch is incomplete
+    console.warn(`Batch ${batch_id} incomplete: ${actualTotal}/${batch.total_count} websites in DB`);
   }
 
   await supabase

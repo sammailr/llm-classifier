@@ -87,31 +87,60 @@ router.post('/', upload.single('file'), async (req, res, next) => {
 
     if (batchError) throw batchError;
 
-    // Create website records
+    // Create website records in chunks to avoid database limits
+    const CHUNK_SIZE = 500; // Insert 500 at a time
     const websiteRecords = urls.map(url => ({
       batch_id: batch.id,
       url,
       status: 'pending',
     }));
 
-    const { data: websites, error: websitesError } = await supabase
-      .from('websites')
-      .insert(websiteRecords)
-      .select();
+    console.log(`Inserting ${websiteRecords.length} websites in chunks of ${CHUNK_SIZE}...`);
 
-    if (websitesError) throw websitesError;
+    // Insert websites in chunks
+    const allWebsites = [];
+    for (let i = 0; i < websiteRecords.length; i += CHUNK_SIZE) {
+      const chunk = websiteRecords.slice(i, i + CHUNK_SIZE);
+      console.log(`Inserting chunk ${Math.floor(i / CHUNK_SIZE) + 1}/${Math.ceil(websiteRecords.length / CHUNK_SIZE)} (${chunk.length} websites)...`);
 
-    // Enqueue classification jobs
-    const jobPromises = websites.map(website =>
-      enqueueJob(QUEUE_NAMES.CLASSIFY_WEBSITE, {
-        website_id: website.id,
-        batch_id: batch.id,
-        url: website.url,
-        prompt_id: prompt_id || null,
-      })
-    );
+      const { data: chunkWebsites, error: chunkError } = await supabase
+        .from('websites')
+        .insert(chunk)
+        .select();
 
-    await Promise.all(jobPromises);
+      if (chunkError) {
+        console.error(`Error inserting chunk at index ${i}:`, chunkError);
+        throw chunkError;
+      }
+
+      allWebsites.push(...chunkWebsites);
+      console.log(`Inserted ${allWebsites.length}/${websiteRecords.length} websites so far`);
+    }
+
+    console.log(`Successfully inserted all ${allWebsites.length} websites`);
+
+    // Enqueue classification jobs in chunks to avoid memory issues
+    console.log(`Enqueuing ${allWebsites.length} jobs...`);
+    const JOB_CHUNK_SIZE = 100;
+    let enqueuedCount = 0;
+
+    for (let i = 0; i < allWebsites.length; i += JOB_CHUNK_SIZE) {
+      const chunk = allWebsites.slice(i, i + JOB_CHUNK_SIZE);
+      const jobPromises = chunk.map(website =>
+        enqueueJob(QUEUE_NAMES.CLASSIFY_WEBSITE, {
+          website_id: website.id,
+          batch_id: batch.id,
+          url: website.url,
+          prompt_id: prompt_id || null,
+        })
+      );
+
+      await Promise.all(jobPromises);
+      enqueuedCount += chunk.length;
+      console.log(`Enqueued ${enqueuedCount}/${allWebsites.length} jobs`);
+    }
+
+    console.log(`All ${allWebsites.length} jobs enqueued successfully`);
 
     // Update batch status
     await supabase
@@ -121,8 +150,8 @@ router.post('/', upload.single('file'), async (req, res, next) => {
 
     res.status(201).json({
       batch,
-      websites_count: websites.length,
-      message: 'Batch created and jobs enqueued',
+      websites_count: allWebsites.length,
+      message: `Batch created with ${allWebsites.length} websites and all jobs enqueued`,
     });
   } catch (error) {
     next(error);
