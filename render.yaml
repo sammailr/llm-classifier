@@ -1,0 +1,66 @@
+services:
+  # API Service
+  - type: web
+    name: llm-classifier-api
+    env: node
+    region: oregon
+    plan: starter
+    buildCommand: cd api && npm install
+    startCommand: cd api && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: SCRAPER_API_URL
+        value: https://website-scraper.samuel-5af.workers.dev/
+      - key: SCRAPER_TIMEOUT
+        value: 10000
+
+  # Worker Service
+  - type: worker
+    name: llm-classifier-worker
+    env: node
+    region: oregon
+    plan: starter
+    buildCommand: cd worker && npm install
+    startCommand: cd worker && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SCRAPER_API_URL
+        value: https://website-scraper.samuel-5af.workers.dev/
+      - key: SCRAPER_TIMEOUT
+        value: 10000
+      - key: WORKER_CONCURRENCY
+        value: 10
+
+  # Frontend Service
+  - type: web
+    name: llm-classifier-frontend
+    env: static
+    region: oregon
+    plan: starter
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://llm-classifier-api.onrender.com/api/*
+    envVars:
+      - key: VITE_API_URL
+        value: https://llm-classifier-api.onrender.com/api

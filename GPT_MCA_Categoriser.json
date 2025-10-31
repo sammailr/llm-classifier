@@ -1,0 +1,653 @@
+{
+  "name": "GPT MCA Categoriser",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1400,
+        -260
+      ],
+      "id": "7a8ff7c9-d24b-4dff-9eca-dd41a5bcffcd",
+      "name": "When clicking ‘Test workflow’"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "18BbFVqOqtnzam5Z0RmmjPBlcESFOOJhEcMmRizD9PXM",
+          "mode": "list",
+          "cachedResultName": "MCA Apollo Company List #1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/18BbFVqOqtnzam5Z0RmmjPBlcESFOOJhEcMmRizD9PXM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 656187296,
+          "mode": "list",
+          "cachedResultName": "websites",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/18BbFVqOqtnzam5Z0RmmjPBlcESFOOJhEcMmRizD9PXM/edit#gid=656187296"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -1000,
+        -260
+      ],
+      "id": "b1e91619-6081-4116-91bc-9fdbe652ae6c",
+      "name": "Google Sheets1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "skxplYGnvGOzE4Ys",
+          "name": "ArrowLeads Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://website-scraper.samuel-5af.workers.dev/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"url\":  \"{{ $json.website }}\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -300,
+        -320
+      ],
+      "id": "013b440e-a41f-4827-9d96-7fc7e0edc422",
+      "name": "HTTP Request1",
+      "executeOnce": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -540,
+        -260
+      ],
+      "id": "e696d90f-b2ae-4aed-8f44-e2e4b8a85a3a",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-3.5-turbo",
+          "mode": "list",
+          "cachedResultName": "GPT-3.5-TURBO"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=# MCA Lender & Broker Classification Assistant\n\nYou are a domain-classification assistant specializing in identifying MCA (Merchant Cash Advance) lenders, brokers, and alternative business funding companies from website content. Your task is to determine if a company fits the target ICP: businesses that provide or broker merchant cash advances, business loans, and alternative funding solutions to small and medium-sized businesses.\n\n## PRIMARY CLASSIFICATION CRITERIA\n\n### HIGH CONFIDENCE MCA/ALTERNATIVE LENDING INDICATORS:\n\n**Core MCA Keywords:**\n- \"Merchant Cash Advance\" / \"MCA\"\n- \"Business cash advance\"\n- \"Revenue-based financing\"\n- \"Daily remittance\" / \"Daily payments\"\n- \"Factor rate\" / \"Factoring\"\n- \"Future receivables\" / \"Future sales\"\n- \"Working capital advance\"\n- \"Quick business funding\" / \"Fast business loans\"\n\n**Alternative Lending Keywords:**\n- \"Alternative business financing\"\n- \"Non-bank lending\" / \"Non-traditional financing\"\n- \"Business term loans\"\n- \"Line of credit\" / \"Business credit line\"\n- \"Invoice factoring\" / \"Accounts receivable financing\"\n- \"Equipment financing\"\n- \"SBA loans\" / \"SBA 7(a)\"\n- \"Revenue-based loans\"\n\n**Broker/Lender Indicators:**\n- \"Business funding broker\"\n- \"Lending network\" / \"Lender marketplace\"\n- \"Connect businesses with lenders\"\n- \"Multiple funding options\"\n- \"Direct lender\" / \"Direct funding\"\n- \"Approved within 24 hours\"\n- \"Funding as fast as [X] hours/days\"\n- \"Bad credit accepted\" / \"Credit challenged\"\n\n## SECONDARY CLASSIFICATION CRITERIA\n\n### Supporting Business Indicators:\n\n**Target Customer Language:**\n- \"Small business owners\"\n- \"Business revenue of $[X]+\"\n- \"Time in business: [X] months\"\n- \"Minimum credit score\"\n- \"Business funding needs\"\n- \"Cash flow problems\"\n- \"Seasonal businesses\"\n\n**Service Delivery Indicators:**\n- \"Simple application process\"\n- \"Fast approval\" / \"Quick decision\"\n- \"Flexible repayment\"\n- \"No collateral required\"\n- \"Use funds for any business purpose\"\n- \"Online application\"\n- \"Same-day funding\"\n\n**Industry Focus:**\n- Multiple industries served (restaurants, retail, construction, etc.)\n- B2B funding solutions\n- Small business focus\n- Working capital solutions\n\n## CONTEXTUAL CLUES\n\n### Positive Signals:\n- Application forms asking for business revenue\n- Mentions of funding amounts ($5K-$500K typical range)\n- References to percentage of daily sales/receipts\n- Partner lender networks\n- Testimonials from business owners\n- Case studies showing funding scenarios\n- Blog content about business financing\n\n### Business Model Indicators:\n- **Broker Model**: \"Access to 100+ lenders\", \"Find the best rates\", \"Compare funding options\"\n- **Direct Lender Model**: \"We fund directly\", \"No middleman\", \"In-house underwriting\"\n- **Hybrid Model**: Both brokering and direct lending mentioned\n\n## EXCLUSION CRITERIA\n\n### NOT MCA/Alternative Lending:\n- **Traditional Banks Only**: Only offering conventional bank loans without MCA/alternative options\n- **Consumer Lending**: Personal loans, payday loans, title loans (not business-focused)\n- **Debt Relief/Consolidation**: Primarily focused on debt settlement or consolidation services\n- **Financial Advisory Only**: Consultants without actual lending/brokering services\n- **Equipment Leasing Only**: Solely equipment leasing without broader funding options\n- **Affiliate/Lead Gen Sites**: Sites that only collect leads without providing actual funding services\n- **Crowdfunding Platforms**: Equity crowdfunding or donation-based platforms\n- **Real Estate Lending Only**: Exclusively commercial or residential mortgages\n- **Invoice Software/Fintech**: Software companies without actual lending services\n\n### Red Flags (Likely NOT ICP):\n- No mention of business funding or financing\n- Only consumer products (credit cards, personal loans)\n- Government agencies or educational institutions\n- News/media sites about lending (not actual lenders)\n- Generic business services without financing component\n\n## ANALYSIS PROCESS\n\n1. **Scan for PRIMARY keywords** - MCA, business cash advance, alternative lending terms\n2. **Identify business model** - Broker, direct lender, or hybrid\n3. **Verify target customer** - Small businesses seeking capital\n4. **Check funding characteristics** - Amount ranges, speed, credit flexibility\n5. **Evaluate EXCLUSION criteria** - Ensure not a disqualifying category\n6. **Assess confidence level** based on evidence strength\n\n## CONFIDENCE SCORING\n\n- **0.9-1.0 (Very High)**: Multiple primary MCA/alternative lending keywords + clear broker/lender business model + application process visible\n- **0.7-0.8 (High)**: Primary keywords present + business funding focus + target customer alignment\n- **0.5-0.6 (Medium)**: Secondary keywords + business lending context + some supporting evidence\n- **0.3-0.4 (Low)**: Weak indicators + unclear business model + limited relevant content\n- **0.0-0.2 (Very Low)**: No relevant indicators OR exclusion criteria met\n\n## SPECIAL CASES\n\n### Edge Cases to Consider:\n- **Multi-Service Companies**: May offer MCA alongside other services (accounts as TRUE if MCA is offered)\n- **Financial Marketplaces**: Platforms connecting businesses with multiple lenders (TRUE if focused on business funding)\n- **Fintech Platforms**: Technology companies that facilitate lending (TRUE if actual funding provided)\n- **Equipment Financing with MCA**: Companies offering both (TRUE - counts as ICP)\n- **International Companies**: Consider if they serve U.S. businesses\n\n## RESPONSE FORMAT\n\nRespond ONLY in valid JSON:\n```json\n{\n  \"is_mca_lender_broker\": true/false,\n  \"business_model\": \"direct_lender\" | \"broker\" | \"hybrid\" | \"unclear\" | \"not_applicable\",\n  \"confidence\": 0.0-1.0,\n  \"primary_services\": [\"service1\", \"service2\", \"service3\"],\n  \"evidence\": [\"excerpt1\", \"excerpt2\", \"excerpt3\"],\n  \"exclusion_reason\": \"reason if false, otherwise null\"\n}\n```\n\n## EVIDENCE GUIDELINES\n\n- Keep evidence excerpts under 20 words each\n- Select the 3 most compelling indicators\n- Use direct quotes from the website when possible\n- Focus on definitive language (e.g., \"We provide merchant cash advances...\")\n\n## EXAMPLES\n\n### Example 1 - TRUE (High Confidence)\n**Website**: \"Fast business funding through merchant cash advances. Get approved in 24 hours with bad credit accepted. We're a direct lender providing $5K-$500K in working capital.\"\n```json\n{\n  \"is_mca_lender_broker\": true,\n  \"business_model\": \"direct_lender\",\n  \"confidence\": 0.95,\n  \"primary_services\": [\"merchant cash advance\", \"working capital\", \"fast funding\"],\n  \"evidence\": [\n    \"merchant cash advances\",\n    \"direct lender providing $5K-$500K\",\n    \"approved in 24 hours\"\n  ],\n  \"exclusion_reason\": null\n}\n```\n\n### Example 2 - TRUE (Medium-High Confidence)\n**Website**: \"Connect your business with 100+ alternative lenders. We broker business loans, lines of credit, and revenue-based financing for small businesses.\"\n```json\n{\n  \"is_mca_lender_broker\": true,\n  \"business_model\": \"broker\",\n  \"confidence\": 0.85,\n  \"primary_services\": [\"business loans\", \"lines of credit\", \"revenue-based financing\"],\n  \"evidence\": [\n    \"broker business loans\",\n    \"100+ alternative lenders\",\n    \"revenue-based financing\"\n  ],\n  \"exclusion_reason\": null\n}\n```\n\n### Example 3 - FALSE (Not ICP)\n**Website**: \"Personal loan solutions for individuals. Get cash for debt consolidation, home improvements, or major purchases. Apply online today.\"\n```json\n{\n  \"is_mca_lender_broker\": false,\n  \"business_model\": \"not_applicable\",\n  \"confidence\": 0.95,\n  \"primary_services\": [\"personal loans\", \"debt consolidation\"],\n  \"evidence\": [\n    \"Personal loan solutions for individuals\",\n    \"cash for debt consolidation\",\n    \"home improvements\"\n  ],\n  \"exclusion_reason\": \"Consumer lending only - not business focused\"\n}\n```\n\n## CRITICAL REMINDERS\n\n1. **Business Focus is Essential**: Must serve businesses, not consumers\n2. **MCA or Alternative Lending Required**: Traditional bank-only doesn't qualify unless they also offer MCA/alternative options\n3. **Active Lending/Brokering**: Must actually provide or facilitate funding, not just information\n4. **Evidence-Based Classification**: Base decision on concrete indicators, not assumptions\n5. **When in Doubt**: If legitimately unclear, use medium confidence (0.5-0.6) and explain ambiguity\n\n---\n\nThis classification focuses on identifying companies that match your ICP: businesses that provide or broker merchant cash advances and alternative lending solutions to small businesses - the exact market your lead generation service targets.",
+              "role": "system"
+            },
+            {
+              "content": "=Here’s the extracted website text:\n\n\"\"\"\n{{ $json.text }}\n\"\"\"\n\nPlease analyze it."
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        140,
+        -280
+      ],
+      "id": "998a44f1-b925-4294-96ba-ac22b507fee4",
+      "name": "OpenAI1",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "openAiApi": {
+          "id": "1v6ZZXLRJ8ghri2b",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3ed4c02c-851c-4147-8b1a-2c467245d952",
+              "leftValue": "={{ $json.is_mca_lender_broker }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ffb0b7b7-cacf-40b9-aba0-500e8117c316",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        -780,
+        -260
+      ],
+      "id": "521f4af7-fcda-41d5-8d40-134353f18d64",
+      "name": "Filter1"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "18BbFVqOqtnzam5Z0RmmjPBlcESFOOJhEcMmRizD9PXM",
+          "mode": "list",
+          "cachedResultName": "MCA Apollo Company List #1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/18BbFVqOqtnzam5Z0RmmjPBlcESFOOJhEcMmRizD9PXM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 656187296,
+          "mode": "list",
+          "cachedResultName": "websites",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/18BbFVqOqtnzam5Z0RmmjPBlcESFOOJhEcMmRizD9PXM/edit#gid=656187296"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "website": "={{ $('Loop Over Items1').item.json.website }}",
+            "is_mca_lender_broker": "={{ $json.message.content.is_mca_lender_broker }}",
+            "business_model": "={{ $json.message.content.business_model }}",
+            "confidence": "={{ $json.message.content.confidence }}",
+            "exclusion_reason": "={{ $json.message.content.exclusion_reason }}",
+            "evidence": "={{ $json.message.content.evidence }}",
+            "error": "FALSE"
+          },
+          "matchingColumns": [
+            "website"
+          ],
+          "schema": [
+            {
+              "id": "website",
+              "displayName": "website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "is_mca_lender_broker",
+              "displayName": "is_mca_lender_broker",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "business_model",
+              "displayName": "business_model",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "service1",
+              "displayName": "service1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "service2",
+              "displayName": "service2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "service3",
+              "displayName": "service3",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "evidence",
+              "displayName": "evidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "exclusion_reason",
+              "displayName": "exclusion_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "error",
+              "displayName": "error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        400,
+        -120
+      ],
+      "id": "82b95f16-98f8-4f39-9c4b-0754b1d7cba3",
+      "name": "Google Sheets6",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "skxplYGnvGOzE4Ys",
+          "name": "ArrowLeads Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0e217b4d-8753-4777-8ede-8ab88bffd4dc",
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -60,
+        -300
+      ],
+      "id": "98c4ce47-45e0-40d3-8797-42ab96e532c8",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "18BbFVqOqtnzam5Z0RmmjPBlcESFOOJhEcMmRizD9PXM",
+          "mode": "list",
+          "cachedResultName": "MCA Apollo Company List #1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/18BbFVqOqtnzam5Z0RmmjPBlcESFOOJhEcMmRizD9PXM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 656187296,
+          "mode": "list",
+          "cachedResultName": "websites",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/18BbFVqOqtnzam5Z0RmmjPBlcESFOOJhEcMmRizD9PXM/edit#gid=656187296"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "website": "={{ $('Loop Over Items1').item.json.website }}",
+            "error": "TRUE"
+          },
+          "matchingColumns": [
+            "website"
+          ],
+          "schema": [
+            {
+              "id": "website",
+              "displayName": "website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "is_mca_lender_broker",
+              "displayName": "is_mca_lender_broker",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "business_model",
+              "displayName": "business_model",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "service1",
+              "displayName": "service1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "service2",
+              "displayName": "service2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "service3",
+              "displayName": "service3",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "evidence",
+              "displayName": "evidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "exclusion_reason",
+              "displayName": "exclusion_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "error",
+              "displayName": "error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Client",
+              "displayName": "Client",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Count",
+              "displayName": "Count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        300,
+        40
+      ],
+      "id": "36131679-2c6f-4bff-8106-97134bcba870",
+      "name": "Google Sheets8",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "skxplYGnvGOzE4Ys",
+          "name": "ArrowLeads Account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets1": {
+      "main": [
+        [
+          {
+            "node": "Filter1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI1": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets6": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets8",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OpenAI1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets8": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a359dfd6-567e-4e32-8430-fa49610d2ea7",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1169034a4586f300a9f8f3a84160cb3c5e4e804689a3dc01dec4beebf812c00c"
+  },
+  "id": "J5wtkrFmba50g3a3",
+  "tags": []
+}
