@@ -112,6 +112,9 @@ async function callOpenAI(scrapedText, systemPrompt, model = 'gpt-3.5-turbo') {
   return JSON.parse(result);
 }
 
+// Track which incomplete batches we've already logged about (to avoid spam)
+const loggedIncompleteBatches = new Set();
+
 export async function classifyWebsite({ website_id, batch_id, url, prompt_id }) {
   let scrapedText = '';
   let classification = null;
@@ -239,7 +242,11 @@ async function updateBatchProgress(batch_id) {
     status = 'completed';
   } else if (actualTotal < batch.total_count) {
     // Some websites weren't inserted - batch is incomplete
-    console.warn(`Batch ${batch_id} incomplete: ${actualTotal}/${batch.total_count} websites in DB`);
+    // Only log this once per batch to avoid spam
+    if (!loggedIncompleteBatches.has(batch_id)) {
+      console.warn(`Batch ${batch_id} incomplete: ${actualTotal}/${batch.total_count} websites in DB (this warning will only appear once)`);
+      loggedIncompleteBatches.add(batch_id);
+    }
   }
 
   await supabase
