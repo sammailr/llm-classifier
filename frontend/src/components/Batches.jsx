@@ -58,6 +58,61 @@ function Batches() {
     return <span className={`badge ${classMap[status] || ''}`}>{status}</span>;
   }
 
+  function exportToCSV(batch) {
+    if (!batch.websites || batch.websites.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    // Create CSV headers
+    const headers = [
+      'URL',
+      'Status',
+      'Is MCA Lender/Broker',
+      'Business Model',
+      'Confidence',
+      'Primary Services',
+      'Evidence',
+      'Exclusion Reason',
+      'Error Message',
+      'Processed At'
+    ];
+
+    // Create CSV rows
+    const rows = batch.websites.map(website => {
+      const result = website.classification_results?.[0];
+      return [
+        website.url,
+        website.status,
+        result?.is_mca_lender_broker !== undefined ? result.is_mca_lender_broker : '',
+        result?.business_model || '',
+        result?.confidence || '',
+        result?.primary_services?.join('; ') || '',
+        result?.evidence?.join('; ') || '',
+        result?.exclusion_reason || '',
+        website.error_message || '',
+        website.processed_at ? new Date(website.processed_at).toLocaleString() : ''
+      ];
+    });
+
+    // Convert to CSV string
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${batch.name.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   if (loading) return <div className="loading">Loading batches...</div>;
 
   return (
@@ -68,11 +123,16 @@ function Batches() {
 
       {selectedBatch ? (
         <div>
-          <button className="secondary" onClick={() => setSelectedBatch(null)}>
-            ← Back to Batches
-          </button>
+          <div className="flex" style={{ gap: '1rem', marginBottom: '1rem' }}>
+            <button className="secondary" onClick={() => setSelectedBatch(null)}>
+              ← Back to Batches
+            </button>
+            <button onClick={() => exportToCSV(selectedBatch)}>
+              Export to CSV
+            </button>
+          </div>
 
-          <div className="card" style={{ marginTop: '1rem' }}>
+          <div className="card">
             <div className="flex-between">
               <h2>{selectedBatch.name}</h2>
               {getStatusBadge(selectedBatch.status)}
