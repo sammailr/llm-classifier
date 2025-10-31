@@ -7,6 +7,8 @@ const openai = new OpenAI({
 
 const SCRAPER_API_URL = process.env.SCRAPER_API_URL || 'https://website-scraper.samuel-5af.workers.dev/';
 const SCRAPER_TIMEOUT = parseInt(process.env.SCRAPER_TIMEOUT || '10000', 10);
+const OPENAI_TIMEOUT = parseInt(process.env.OPENAI_TIMEOUT || '30000', 10);
+const OVERALL_TIMEOUT = parseInt(process.env.OVERALL_TIMEOUT || '60000', 10);
 
 // Default MCA classification prompt (from the n8n workflow)
 const DEFAULT_SYSTEM_PROMPT = `# MCA Lender & Broker Classification Assistant
@@ -92,30 +94,55 @@ async function scrapeWebsite(url) {
 }
 
 async function callOpenAI(scrapedText, systemPrompt, model = 'gpt-3.5-turbo') {
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      {
-        role: 'system',
-        content: systemPrompt,
-      },
-      {
-        role: 'user',
-        content: `Here's the extracted website text:\n\n"""\n${scrapedText}\n"""\n\nPlease analyze it.`,
-      },
-    ],
-    response_format: { type: 'json_object' },
-    temperature: 0.1,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), OPENAI_TIMEOUT);
 
-  const result = completion.choices[0].message.content;
-  return JSON.parse(result);
+  try {
+    const completion = await openai.chat.completions.create({
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt,
+        },
+        {
+          role: 'user',
+          content: `Here's the extracted website text:\n\n"""\n${scrapedText}\n"""\n\nPlease analyze it.`,
+        },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.1,
+    }, {
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    const result = completion.choices[0].message.content;
+    return JSON.parse(result);
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('OpenAI request timeout');
+    }
+    throw error;
+  }
 }
 
 // Track which incomplete batches we've already logged about (to avoid spam)
 const loggedIncompleteBatches = new Set();
 
-export async function classifyWebsite({ website_id, batch_id, url, prompt_id }) {
+// Wrapper to add timeout to any async function
+function withTimeout(promise, timeoutMs, errorMessage) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+    ),
+  ]);
+}
+
+async function classifyWebsiteInternal({ website_id, batch_id, url, prompt_id }) {
   let scrapedText = '';
   let classification = null;
   let error = null;
@@ -258,6 +285,36 @@ async function updateBatchProgress(batch_id) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', batch_id);
+}
+
+// Export wrapper with overall timeout
+export async function classifyWebsite(jobData) {
+  try {
+    await withTimeout(
+      classifyWebsiteInternal(jobData),
+      OVERALL_TIMEOUT,
+      `Overall classification timeout (${OVERALL_TIMEOUT}ms) for ${jobData.url}`
+    );
+  } catch (err) {
+    // If overall timeout is hit, ensure we mark the website as failed
+    if (err.message.includes('Overall classification timeout')) {
+      console.error(`Overall timeout for ${jobData.url}`);
+      await supabase
+        .from('websites')
+        .update({
+          status: 'failed',
+          error_message: err.message,
+          processed_at: new Date().toISOString(),
+        })
+        .eq('id', jobData.website_id);
+
+      await updateBatchProgress(jobData.batch_id);
+    } else {
+      // This shouldn't happen since classifyWebsiteInternal handles all errors
+      // But just in case, log it
+      console.error(`Unexpected error in classifyWebsite for ${jobData.url}:`, err.message);
+    }
+  }
 }
 
 export default classifyWebsite;
