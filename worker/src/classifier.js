@@ -203,7 +203,8 @@ export async function classifyWebsite({ website_id, batch_id, url, prompt_id }) 
     // Update batch progress even on failure
     await updateBatchProgress(batch_id);
 
-    throw err;
+    // Don't re-throw - we've handled the error and don't want pg-boss to retry
+    // permanent failures like scraper timeouts or no content
   }
 }
 
