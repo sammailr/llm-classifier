@@ -53,8 +53,6 @@ services:
   - type: web
     name: llm-classifier-frontend
     env: static
-    region: oregon
-    plan: starter
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/dist
     routes:
