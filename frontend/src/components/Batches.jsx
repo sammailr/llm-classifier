@@ -34,6 +34,15 @@ function Batches() {
     }
   }
 
+  async function handleExportBatch(batchId) {
+    try {
+      const data = await getBatch(batchId);
+      exportToCSV(data);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function handleDeleteBatch(batchId) {
     if (!confirm('Are you sure you want to delete this batch?')) return;
 
@@ -226,6 +235,7 @@ function Batches() {
                   <td>
                     <div className="flex">
                       <button onClick={() => handleViewBatch(batch.id)}>View</button>
+                      <button onClick={() => handleExportBatch(batch.id)}>Export CSV</button>
                       <button className="danger" onClick={() => handleDeleteBatch(batch.id)}>
                         Delete
                       </button>
