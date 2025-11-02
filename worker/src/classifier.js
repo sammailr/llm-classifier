@@ -157,6 +157,8 @@ async function classifyWebsiteInternal({ website_id, batch_id, url, prompt_id })
 
     if (website?.status === 'cancelled') {
       console.log(`Skipping cancelled website: ${url}`);
+      // Still update batch progress so it can complete
+      await updateBatchProgress(batch_id);
       return; // Exit early - website was cancelled
     }
 
@@ -168,6 +170,8 @@ async function classifyWebsiteInternal({ website_id, batch_id, url, prompt_id })
 
     if (batch?.status === 'cancelled') {
       console.log(`Skipping website from cancelled batch: ${url}`);
+      // Still update batch progress so it can complete
+      await updateBatchProgress(batch_id);
       return; // Exit early - batch was cancelled
     }
 
@@ -262,10 +266,10 @@ async function classifyWebsiteInternal({ website_id, batch_id, url, prompt_id })
 }
 
 async function updateBatchProgress(batch_id) {
-  // Get batch to check actual total_count
+  // Get batch to check actual total_count and current status
   const { data: batch } = await supabase
     .from('batches')
-    .select('total_count')
+    .select('total_count, status')
     .eq('id', batch_id)
     .single();
 
@@ -282,20 +286,29 @@ async function updateBatchProgress(batch_id) {
 
   const completed = websites.filter(w => w.status === 'completed').length;
   const failed = websites.filter(w => w.status === 'failed').length;
+  const cancelled = websites.filter(w => w.status === 'cancelled').length;
   const processing = websites.filter(w => w.status === 'processing').length;
   const actualTotal = websites.length;
 
-  // Use the batch's total_count (claimed) not the actual DB count
-  // This ensures we mark as complete only when we've processed everything we claimed to create
-  let status = 'processing';
-  if (completed + failed === batch.total_count) {
-    status = 'completed';
-  } else if (actualTotal < batch.total_count) {
-    // Some websites weren't inserted - batch is incomplete
-    // Only log this once per batch to avoid spam
-    if (!loggedIncompleteBatches.has(batch_id)) {
-      console.warn(`Batch ${batch_id} incomplete: ${actualTotal}/${batch.total_count} websites in DB (this warning will only appear once)`);
-      loggedIncompleteBatches.add(batch_id);
+  // Count total processed (including cancelled)
+  const totalProcessed = completed + failed + cancelled;
+
+  // Determine status
+  // If batch is already cancelled, keep it cancelled
+  // Otherwise, check if all websites have been processed
+  let status = batch.status;
+  if (status !== 'cancelled') {
+    if (totalProcessed === batch.total_count) {
+      status = 'completed';
+    } else if (actualTotal < batch.total_count) {
+      // Some websites weren't inserted - batch is incomplete
+      // Only log this once per batch to avoid spam
+      if (!loggedIncompleteBatches.has(batch_id)) {
+        console.warn(`Batch ${batch_id} incomplete: ${actualTotal}/${batch.total_count} websites in DB (this warning will only appear once)`);
+        loggedIncompleteBatches.add(batch_id);
+      }
+    } else {
+      status = 'processing';
     }
   }
 
