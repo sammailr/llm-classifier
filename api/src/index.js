@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import batchRoutes from './routes/batches.js';
 import promptRoutes from './routes/prompts.js';
 import jobRoutes from './routes/jobs.js';
+import statsRoutes from './routes/stats.js';
 import { initQueue } from './queue.js';
 
 dotenv.config();
@@ -25,6 +26,7 @@ app.get('/health', (req, res) => {
 app.use('/api/batches', batchRoutes);
 app.use('/api/prompts', promptRoutes);
 app.use('/api/jobs', jobRoutes);
+app.use('/api/stats', statsRoutes);
 
 // Error handling
 app.use((err, req, res, next) => {

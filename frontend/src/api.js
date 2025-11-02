@@ -46,3 +46,6 @@ export const deletePrompt = (id) => fetchAPI(`/prompts/${id}`, { method: 'DELETE
 
 // Jobs
 export const getJobStats = () => fetchAPI('/jobs/stats');
+
+// Stats
+export const getOpenAIStats = () => fetchAPI('/stats/openai');

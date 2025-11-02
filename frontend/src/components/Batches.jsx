@@ -10,8 +10,13 @@ function Batches() {
 
   useEffect(() => {
     loadBatches();
+    loadOpenAIStats();
     const interval = setInterval(loadBatches, 5000); // Refresh every 5 seconds
-    return () => clearInterval(interval);
+    const statsInterval = setInterval(loadOpenAIStats, 30000); // Refresh every 30 seconds
+    return () => {
+      clearInterval(interval);
+      clearInterval(statsInterval);
+    };
   }, []);
 
   async function loadBatches() {
@@ -23,6 +28,16 @@ function Batches() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadOpenAIStats() {
+    try {
+      const data = await getOpenAIStats();
+      setOpenAIStats(data);
+    } catch (err) {
+      console.error('Failed to load OpenAI stats:', err);
+      // Don't set error state - this is optional info
     }
   }
 
@@ -127,7 +142,14 @@ function Batches() {
 
   return (
     <div>
-      <h2>Batches</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h2 style={{ margin: 0 }}>Batches</h2>
+        {openAIStats && openAIStats.credit_remaining && (
+          <div style={{ padding: '0.5rem 1rem', backgroundColor: '#f3f4f6', borderRadius: '0.5rem', fontSize: '0.875rem' }}>
+            <strong>OpenAI Credits:</strong> ${openAIStats.credit_remaining}
+          </div>
+        )}
+      </div>
 
       {error && <div className="error">{error}</div>}
 
