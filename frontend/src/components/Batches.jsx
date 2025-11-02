@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getBatches, getBatch, deleteBatch, getOpenAIStats } from '../api';
+import { getBatches, getBatch, cancelBatch, deleteBatch, getOpenAIStats } from '../api';
 
 function Batches() {
   const [batches, setBatches] = useState([]);
@@ -59,6 +59,18 @@ function Batches() {
     }
   }
 
+  async function handleCancelBatch(batchId) {
+    if (!confirm('Are you sure you want to cancel this batch? Pending jobs will be stopped.')) return;
+
+    try {
+      await cancelBatch(batchId);
+      // Refresh batches to show updated status
+      loadBatches();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function handleDeleteBatch(batchId) {
     if (!confirm('Are you sure you want to delete this batch?')) return;
 
@@ -79,6 +91,7 @@ function Batches() {
       processing: 'badge-info',
       completed: 'badge-success',
       failed: 'badge-error',
+      cancelled: 'badge-neutral',
     };
     return <span className={`badge ${classMap[status] || ''}`}>{status}</span>;
   }
@@ -276,6 +289,11 @@ function Batches() {
                       <div className="flex">
                         <button onClick={() => handleViewBatch(batch.id)}>View</button>
                         <button onClick={() => handleExportBatch(batch.id)}>Export CSV</button>
+                        {(batch.status === 'pending' || batch.status === 'processing') && (
+                          <button className="secondary" onClick={() => handleCancelBatch(batch.id)}>
+                            Cancel
+                          </button>
+                        )}
                         <button className="danger" onClick={() => handleDeleteBatch(batch.id)}>
                           Delete
                         </button>

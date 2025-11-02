@@ -178,6 +178,41 @@ router.post('/', upload.single('file'), async (req, res, next) => {
   }
 });
 
+// Cancel batch (mark all pending/processing websites as cancelled)
+router.post('/:id/cancel', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Update batch status to cancelled
+    const { error: batchError } = await supabase
+      .from('batches')
+      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (batchError) throw batchError;
+
+    // Cancel all pending and processing websites
+    const { error: websitesError } = await supabase
+      .from('websites')
+      .update({
+        status: 'cancelled',
+        error_message: 'Batch cancelled by user',
+        processed_at: new Date().toISOString()
+      })
+      .eq('batch_id', id)
+      .in('status', ['pending', 'processing']);
+
+    if (websitesError) throw websitesError;
+
+    // Note: We can't easily cancel jobs already in pg-boss queue
+    // They will fail when they check the website status
+
+    res.json({ message: 'Batch cancelled' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Delete batch
 router.delete('/:id', async (req, res, next) => {
   try {

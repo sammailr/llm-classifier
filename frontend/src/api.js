@@ -29,6 +29,7 @@ export const createBatchWithFile = (formData) =>
     method: 'POST',
     body: formData,
   }).then(r => r.json());
+export const cancelBatch = (id) => fetchAPI(`/batches/${id}/cancel`, { method: 'POST' });
 export const deleteBatch = (id) => fetchAPI(`/batches/${id}`, { method: 'DELETE' });
 
 // Prompts
