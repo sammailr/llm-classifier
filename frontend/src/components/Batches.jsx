@@ -214,35 +214,51 @@ function Batches() {
                 <th>Name</th>
                 <th>Status</th>
                 <th>Progress</th>
-                <th>Created</th>
+                <th>Classification Stats</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {batches.map(batch => (
-                <tr key={batch.id}>
-                  <td>{batch.name}</td>
-                  <td>{getStatusBadge(batch.status)}</td>
-                  <td>
-                    {batch.completed_count || 0} / {batch.total_count}
-                    {batch.failed_count > 0 && (
-                      <span className="small-text" style={{ marginLeft: '0.5rem', color: '#dc2626' }}>
-                        ({batch.failed_count} failed)
-                      </span>
-                    )}
-                  </td>
-                  <td className="small-text">{new Date(batch.created_at).toLocaleString()}</td>
-                  <td>
-                    <div className="flex">
-                      <button onClick={() => handleViewBatch(batch.id)}>View</button>
-                      <button onClick={() => handleExportBatch(batch.id)}>Export CSV</button>
-                      <button className="danger" onClick={() => handleDeleteBatch(batch.id)}>
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {batches.map(batch => {
+                const processedCount = (batch.completed_count || 0) + (batch.failed_count || 0);
+                const successRate = batch.completed_count > 0
+                  ? ((batch.completed_count / processedCount) * 100).toFixed(0)
+                  : 0;
+
+                return (
+                  <tr key={batch.id}>
+                    <td>{batch.name}</td>
+                    <td>{getStatusBadge(batch.status)}</td>
+                    <td>
+                      {batch.completed_count || 0} / {batch.total_count}
+                      {batch.failed_count > 0 && (
+                        <span className="small-text" style={{ marginLeft: '0.5rem', color: '#dc2626' }}>
+                          ({batch.failed_count} failed)
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {processedCount > 0 ? (
+                        <div style={{ fontSize: '0.875rem' }}>
+                          <div>✓ Success: {batch.completed_count || 0} ({successRate}%)</div>
+                          <div style={{ color: '#dc2626' }}>✗ Failed: {batch.failed_count || 0}</div>
+                        </div>
+                      ) : (
+                        <span className="small-text" style={{ color: '#6b7280' }}>-</span>
+                      )}
+                    </td>
+                    <td>
+                      <div className="flex">
+                        <button onClick={() => handleViewBatch(batch.id)}>View</button>
+                        <button onClick={() => handleExportBatch(batch.id)}>Export CSV</button>
+                        <button className="danger" onClick={() => handleDeleteBatch(batch.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 
