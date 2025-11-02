@@ -148,6 +148,29 @@ async function classifyWebsiteInternal({ website_id, batch_id, url, prompt_id })
   let error = null;
 
   try {
+    // First, check if the website or batch has been cancelled
+    const { data: website } = await supabase
+      .from('websites')
+      .select('status')
+      .eq('id', website_id)
+      .single();
+
+    if (website?.status === 'cancelled') {
+      console.log(`Skipping cancelled website: ${url}`);
+      return; // Exit early - website was cancelled
+    }
+
+    const { data: batch } = await supabase
+      .from('batches')
+      .select('status')
+      .eq('id', batch_id)
+      .single();
+
+    if (batch?.status === 'cancelled') {
+      console.log(`Skipping website from cancelled batch: ${url}`);
+      return; // Exit early - batch was cancelled
+    }
+
     // Update status to processing
     await supabase
       .from('websites')
