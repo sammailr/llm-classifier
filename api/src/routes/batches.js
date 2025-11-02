@@ -10,14 +10,34 @@ const upload = multer({ storage: multer.memoryStorage() });
 // Get all batches
 router.get('/', async (req, res, next) => {
   try {
-    const { data, error } = await supabase
+    const { data: batches, error } = await supabase
       .from('batches')
-      .select('*, websites(count)')
+      .select('*')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
-    res.json(data);
+    // For each batch, get classification stats
+    const batchesWithStats = await Promise.all(
+      batches.map(async (batch) => {
+        // Get classification results count
+        const { data: results } = await supabase
+          .from('classification_results')
+          .select('is_mca_lender_broker')
+          .eq('batch_id', batch.id);
+
+        const yesCount = results?.filter(r => r.is_mca_lender_broker === true).length || 0;
+        const noCount = results?.filter(r => r.is_mca_lender_broker === false).length || 0;
+
+        return {
+          ...batch,
+          classification_yes: yesCount,
+          classification_no: noCount,
+        };
+      })
+    );
+
+    res.json(batchesWithStats);
   } catch (error) {
     next(error);
   }

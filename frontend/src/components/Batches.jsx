@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { getBatches, getBatch, deleteBatch } from '../api';
+import { getBatches, getBatch, deleteBatch, getOpenAIStats } from '../api';
 
 function Batches() {
   const [batches, setBatches] = useState([]);
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [openAIStats, setOpenAIStats] = useState(null);
 
   useEffect(() => {
     loadBatches();
@@ -220,9 +221,11 @@ function Batches() {
             </thead>
             <tbody>
               {batches.map(batch => {
-                const processedCount = (batch.completed_count || 0) + (batch.failed_count || 0);
-                const successRate = batch.completed_count > 0
-                  ? ((batch.completed_count / processedCount) * 100).toFixed(0)
+                const yesCount = batch.classification_yes || 0;
+                const noCount = batch.classification_no || 0;
+                const totalClassified = yesCount + noCount;
+                const yesPercentage = totalClassified > 0
+                  ? ((yesCount / totalClassified) * 100).toFixed(0)
                   : 0;
 
                 return (
@@ -238,10 +241,10 @@ function Batches() {
                       )}
                     </td>
                     <td>
-                      {processedCount > 0 ? (
+                      {totalClassified > 0 ? (
                         <div style={{ fontSize: '0.875rem' }}>
-                          <div>✓ Success: {batch.completed_count || 0} ({successRate}%)</div>
-                          <div style={{ color: '#dc2626' }}>✗ Failed: {batch.failed_count || 0}</div>
+                          <div style={{ color: '#059669' }}>✓ Yes: {yesCount} ({yesPercentage}%)</div>
+                          <div style={{ color: '#6b7280' }}>✗ No: {noCount}</div>
                         </div>
                       ) : (
                         <span className="small-text" style={{ color: '#6b7280' }}>-</span>
