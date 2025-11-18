@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Fast LLM-powered website classification system",
   "private": true,
+  "type": "module",
   "workspaces": [
     "api",
     "worker",
@@ -14,7 +15,14 @@
     "dev:frontend": "npm run dev --workspace=frontend",
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:worker\" \"npm run dev:frontend\"",
     "build": "npm run build --workspaces",
-    "install:all": "npm install && npm install --workspaces"
+    "install:all": "npm install && npm install --workspaces",
+    "batch:create": "node scripts/create-batch-from-csv.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "csv-parse": "^5.5.3",
+    "dotenv": "^16.3.1",
+    "pg-boss": "^9.0.3"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
