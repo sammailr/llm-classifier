@@ -2,43 +2,33 @@ import express from 'express';
 import multer from 'multer';
 import { parse } from 'csv-parse/sync';
 import supabase from '../supabase.js';
+import pool from '../db.js';
 import { enqueueJob, QUEUE_NAMES } from '../queue.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Get all batches
+// Get all batches - Using direct SQL to bypass Supabase REST API timeouts
 router.get('/', async (req, res, next) => {
   try {
-    console.log('Fetching batches...');
+    console.log('Fetching batches via direct SQL...');
 
-    // Limit to recent batches and essential fields only
-    const { data: batches, error } = await supabase
-      .from('batches')
-      .select('id, name, status, total_count, completed_count, failed_count, created_at, updated_at')
-      .order('created_at', { ascending: false })
-      .limit(50);
+    const result = await pool.query(`
+      SELECT id, name, status, total_count, completed_count, failed_count, created_at, updated_at
+      FROM batches
+      ORDER BY created_at DESC
+      LIMIT 50
+    `);
 
-    console.log(`Fetched ${batches?.length || 0} batches`);
-
-    if (error) {
-      console.error('Supabase error:', error);
-      throw error;
-    }
-
-    if (!batches) {
-      console.error('No batches returned');
-      return res.json([]);
-    }
+    console.log(`Fetched ${result.rows.length} batches`);
 
     // Return batches with placeholder stats
-    const response = batches.map(batch => ({
+    const response = result.rows.map(batch => ({
       ...batch,
       classification_yes: 0,
       classification_no: 0,
     }));
 
-    console.log('Sending response...');
     res.json(response);
   } catch (error) {
     console.error('Error in GET /batches:', error);
