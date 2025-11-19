@@ -10,21 +10,38 @@ const upload = multer({ storage: multer.memoryStorage() });
 // Get all batches
 router.get('/', async (req, res, next) => {
   try {
+    console.log('Fetching batches...');
+
+    // Limit to recent batches and essential fields only
     const { data: batches, error } = await supabase
       .from('batches')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('id, name, status, total_count, completed_count, failed_count, created_at, updated_at')
+      .order('created_at', { ascending: false })
+      .limit(50);
 
-    if (error) throw error;
+    console.log(`Fetched ${batches?.length || 0} batches`);
 
-    // Just return batches without stats to avoid timeout
-    // Stats will be loaded on individual batch view
-    res.json(batches.map(batch => ({
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
+
+    if (!batches) {
+      console.error('No batches returned');
+      return res.json([]);
+    }
+
+    // Return batches with placeholder stats
+    const response = batches.map(batch => ({
       ...batch,
       classification_yes: 0,
       classification_no: 0,
-    })));
+    }));
+
+    console.log('Sending response...');
+    res.json(response);
   } catch (error) {
+    console.error('Error in GET /batches:', error);
     next(error);
   }
 });
