@@ -63,11 +63,13 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-// Create new batch from CSV or JSON
+// Create new batch from CSV or JSON - Using direct SQL
 router.post('/', upload.single('file'), async (req, res, next) => {
   try {
     const { prompt_id, name } = req.body;
     let urls = [];
+
+    console.log('Creating batch - parsing URLs...');
 
     // Parse URLs from file or body
     if (req.file) {
@@ -86,54 +88,50 @@ router.post('/', upload.single('file'), async (req, res, next) => {
       return res.status(400).json({ error: 'No URLs provided' });
     }
 
-    // Create batch
-    const { data: batch, error: batchError } = await supabase
-      .from('batches')
-      .insert({
-        name: name || `Batch ${new Date().toISOString()}`,
-        prompt_id: prompt_id || null,
-        total_count: urls.length,
-        status: 'pending',
-      })
-      .select()
-      .single();
+    console.log(`Parsed ${urls.length} URLs`);
 
-    if (batchError) throw batchError;
+    // Create batch using direct SQL
+    const batchResult = await pool.query(
+      `INSERT INTO batches (name, prompt_id, total_count, status, created_at, updated_at)
+       VALUES ($1, $2, $3, 'pending', NOW(), NOW())
+       RETURNING id, name, status, total_count, created_at`,
+      [name || `Batch ${new Date().toISOString()}`, prompt_id || null, urls.length]
+    );
 
-    // Create website records in chunks to avoid database limits
-    const CHUNK_SIZE = 500; // Insert 500 at a time
-    const websiteRecords = urls.map(url => ({
-      batch_id: batch.id,
-      url,
-      status: 'pending',
-    }));
+    const batch = batchResult.rows[0];
+    console.log(`Batch created: ${batch.id}`);
 
-    console.log(`Inserting ${websiteRecords.length} websites in chunks of ${CHUNK_SIZE}...`);
-
-    // Insert websites in chunks
+    // Insert websites in chunks using direct SQL
+    const CHUNK_SIZE = 500;
     const allWebsites = [];
-    for (let i = 0; i < websiteRecords.length; i += CHUNK_SIZE) {
-      const chunk = websiteRecords.slice(i, i + CHUNK_SIZE);
-      console.log(`Inserting chunk ${Math.floor(i / CHUNK_SIZE) + 1}/${Math.ceil(websiteRecords.length / CHUNK_SIZE)} (${chunk.length} websites)...`);
 
-      const { data: chunkWebsites, error: chunkError } = await supabase
-        .from('websites')
-        .insert(chunk)
-        .select();
+    for (let i = 0; i < urls.length; i += CHUNK_SIZE) {
+      const chunk = urls.slice(i, i + CHUNK_SIZE);
+      console.log(`Inserting chunk ${Math.floor(i / CHUNK_SIZE) + 1}/${Math.ceil(urls.length / CHUNK_SIZE)}`);
 
-      if (chunkError) {
-        console.error(`Error inserting chunk at index ${i}:`, chunkError);
-        throw chunkError;
-      }
+      // Build VALUES string
+      const values = [];
+      const params = [];
+      chunk.forEach((url, idx) => {
+        const offset = idx * 2;
+        values.push(`($${offset + 1}, $${offset + 2}, 'pending', NOW())`);
+        params.push(batch.id, url);
+      });
 
-      allWebsites.push(...chunkWebsites);
-      console.log(`Inserted ${allWebsites.length}/${websiteRecords.length} websites so far`);
+      const insertQuery = `
+        INSERT INTO websites (batch_id, url, status, created_at)
+        VALUES ${values.join(', ')}
+        RETURNING id, url
+      `;
+
+      const result = await pool.query(insertQuery, params);
+      allWebsites.push(...result.rows);
     }
 
-    console.log(`Successfully inserted all ${allWebsites.length} websites`);
+    console.log(`Inserted ${allWebsites.length} websites`);
 
-    // Enqueue classification jobs in chunks to avoid memory issues
-    console.log(`Enqueuing ${allWebsites.length} jobs...`);
+    // Enqueue jobs
+    console.log('Enqueueing jobs...');
     const JOB_CHUNK_SIZE = 100;
     let enqueuedCount = 0;
 
@@ -150,16 +148,15 @@ router.post('/', upload.single('file'), async (req, res, next) => {
 
       await Promise.all(jobPromises);
       enqueuedCount += chunk.length;
-      console.log(`Enqueued ${enqueuedCount}/${allWebsites.length} jobs`);
     }
 
-    console.log(`All ${allWebsites.length} jobs enqueued successfully`);
+    console.log(`Enqueued ${enqueuedCount} jobs`);
 
-    // Update batch status
-    await supabase
-      .from('batches')
-      .update({ status: 'processing' })
-      .eq('id', batch.id);
+    // Update batch status to processing
+    await pool.query(
+      `UPDATE batches SET status = 'processing', updated_at = NOW() WHERE id = $1`,
+      [batch.id]
+    );
 
     res.status(201).json({
       batch,
@@ -167,6 +164,7 @@ router.post('/', upload.single('file'), async (req, res, next) => {
       message: `Batch created with ${allWebsites.length} websites and all jobs enqueued`,
     });
   } catch (error) {
+    console.error('Error creating batch:', error);
     next(error);
   }
 });
