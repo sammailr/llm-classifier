@@ -17,27 +17,13 @@ router.get('/', async (req, res, next) => {
 
     if (error) throw error;
 
-    // For each batch, get classification stats
-    const batchesWithStats = await Promise.all(
-      batches.map(async (batch) => {
-        // Get classification results count
-        const { data: results } = await supabase
-          .from('classification_results')
-          .select('is_mca_lender_broker')
-          .eq('batch_id', batch.id);
-
-        const yesCount = results?.filter(r => r.is_mca_lender_broker === true).length || 0;
-        const noCount = results?.filter(r => r.is_mca_lender_broker === false).length || 0;
-
-        return {
-          ...batch,
-          classification_yes: yesCount,
-          classification_no: noCount,
-        };
-      })
-    );
-
-    res.json(batchesWithStats);
+    // Just return batches without stats to avoid timeout
+    // Stats will be loaded on individual batch view
+    res.json(batches.map(batch => ({
+      ...batch,
+      classification_yes: 0,
+      classification_no: 0,
+    })));
   } catch (error) {
     next(error);
   }
