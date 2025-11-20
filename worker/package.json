@@ -11,6 +11,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
     "dotenv": "^16.3.1",
+    "pg": "^8.16.3",
     "pg-boss": "^9.0.3",
     "openai": "^4.20.1",
     "p-limit": "^5.0.0"
