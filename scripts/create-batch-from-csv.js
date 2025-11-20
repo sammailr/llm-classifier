@@ -26,20 +26,34 @@ dotenv.config({ path: path.join(process.cwd(), '.env') });
 dotenv.config({ path: path.join(process.cwd(), 'api', '.env') });
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const DATABASE_URL = process.env.DATABASE_URL;
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+// Debug: Show what we loaded (masked for security)
+console.log('\n🔍 Debug Info:');
+console.log(`   SUPABASE_URL: ${SUPABASE_URL ? SUPABASE_URL.substring(0, 30) + '...' : 'NOT SET'}`);
+console.log(`   SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY ? SUPABASE_SERVICE_KEY.substring(0, 20) + '...' : 'NOT SET'}`);
+console.log(`   DATABASE_URL: ${DATABASE_URL ? DATABASE_URL.substring(0, 40) + '...' : 'NOT SET'}\n`);
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   console.error('❌ Missing Supabase credentials in .env file');
+  console.error('   Make sure api/.env has SUPABASE_URL and SUPABASE_SERVICE_KEY');
   process.exit(1);
 }
 
 if (!DATABASE_URL) {
   console.error('❌ Missing DATABASE_URL in .env file');
+  console.error('   Make sure api/.env has DATABASE_URL');
   process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Use service key to bypass RLS policies
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 
 const WEBSITE_CHUNK_SIZE = 500; // Insert websites in chunks of 500
 const JOB_CHUNK_SIZE = 100; // Enqueue jobs in chunks of 100
@@ -89,7 +103,9 @@ async function main() {
 
     // Step 2: Create batch
     console.log('📝 Creating batch in database...');
-    const { data: batch, error: batchError } = await supabase
+    console.log('   (Testing Supabase connection...)');
+
+    const batchPromise = supabase
       .from('batches')
       .insert({
         name: batchName,
@@ -100,8 +116,27 @@ async function main() {
       .select()
       .single();
 
+    // Add timeout to detect connection issues
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Supabase connection timeout (30s)')), 30000)
+    );
+
+    const { data: batch, error: batchError } = await Promise.race([
+      batchPromise,
+      timeoutPromise
+    ]).catch(err => {
+      console.error('\n❌ Failed to create batch:', err.message);
+      console.error('\nTroubleshooting:');
+      console.error('   1. Check your Supabase credentials in api/.env');
+      console.error('   2. Verify your network connection');
+      console.error('   3. Ensure SUPABASE_URL and SUPABASE_ANON_KEY are correct');
+      console.error('   4. Try running: curl ' + SUPABASE_URL + '/rest/v1/');
+      process.exit(1);
+    });
+
     if (batchError) {
       console.error('❌ Failed to create batch:', batchError.message);
+      console.error('   Error details:', batchError);
       process.exit(1);
     }
 

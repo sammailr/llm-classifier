@@ -16,12 +16,15 @@
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:worker\" \"npm run dev:frontend\"",
     "build": "npm run build --workspaces",
     "install:all": "npm install && npm install --workspaces",
-    "batch:create": "node scripts/create-batch-from-csv.js"
+    "batch:create": "node scripts/create-batch-from-csv.js",
+    "batch:list": "node scripts/list-batches.js",
+    "batch:enqueue": "node scripts/enqueue-batch-jobs.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
     "csv-parse": "^5.5.3",
     "dotenv": "^16.3.1",
+    "pg": "^8.16.3",
     "pg-boss": "^9.0.3"
   },
   "devDependencies": {
