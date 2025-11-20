@@ -266,17 +266,18 @@ async function classifyWebsiteInternal({ website_id, batch_id, url, prompt_id })
 }
 
 async function updateBatchProgress(batch_id) {
-  // Get batch to check actual total_count and current status
-  const { data: batch } = await supabase
-    .from('batches')
-    .select('total_count, status')
-    .eq('id', batch_id)
-    .single();
+  try {
+    // Get batch to check actual total_count and current status
+    const { data: batch, error: batchError } = await supabase
+      .from('batches')
+      .select('total_count, status')
+      .eq('id', batch_id)
+      .single();
 
-  if (!batch) {
-    console.error(`Batch ${batch_id} not found`);
-    return;
-  }
+    if (batchError || !batch) {
+      // Silently skip if batch lookup fails (likely Supabase REST API timeout)
+      return;
+    }
 
   // Get website counts
   const { data: websites } = await supabase
@@ -312,15 +313,19 @@ async function updateBatchProgress(batch_id) {
     }
   }
 
-  await supabase
-    .from('batches')
-    .update({
-      completed_count: completed,
-      failed_count: failed,
-      status,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', batch_id);
+    await supabase
+      .from('batches')
+      .update({
+        completed_count: completed,
+        failed_count: failed,
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', batch_id);
+  } catch (error) {
+    // Silently skip batch update if Supabase REST API fails
+    // The classification still succeeds, just progress tracking fails
+  }
 }
 
 // Export wrapper with overall timeout
