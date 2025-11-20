@@ -85,6 +85,12 @@ async function scrapeWebsite(url) {
     }
 
     const data = await response.json();
+
+    // Check if scraper returned an error
+    if (!data.success) {
+      throw new Error(data.error || 'Scraper failed without error message');
+    }
+
     return data.text || '';
   } catch (error) {
     if (error.name === 'AbortError') {
