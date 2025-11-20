@@ -36,29 +36,43 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// Get single batch with websites
+// Get single batch with websites - Using direct SQL
 router.get('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const { data: batch, error: batchError } = await supabase
-      .from('batches')
-      .select('*')
-      .eq('id', id)
-      .single();
+    console.log(`Fetching batch ${id}...`);
 
-    if (batchError) throw batchError;
+    // Get batch
+    const batchResult = await pool.query(
+      'SELECT * FROM batches WHERE id = $1',
+      [id]
+    );
 
-    const { data: websites, error: websitesError } = await supabase
-      .from('websites')
-      .select('*, classification_results(*)')
-      .eq('batch_id', id)
-      .order('created_at', { ascending: false });
+    if (batchResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Batch not found' });
+    }
 
-    if (websitesError) throw websitesError;
+    const batch = batchResult.rows[0];
 
-    res.json({ ...batch, websites });
+    // Get websites with classification results (limit to avoid timeout on huge batches)
+    const websitesResult = await pool.query(`
+      SELECT
+        w.*,
+        json_agg(cr.*) FILTER (WHERE cr.id IS NOT NULL) as classification_results
+      FROM websites w
+      LEFT JOIN classification_results cr ON cr.website_id = w.id
+      WHERE w.batch_id = $1
+      GROUP BY w.id
+      ORDER BY w.created_at DESC
+      LIMIT 1000
+    `, [id]);
+
+    console.log(`Fetched ${websitesResult.rows.length} websites`);
+
+    res.json({ ...batch, websites: websitesResult.rows });
   } catch (error) {
+    console.error('Error fetching batch:', error);
     next(error);
   }
 });
