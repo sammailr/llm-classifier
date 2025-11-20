@@ -130,38 +130,48 @@ router.post('/', upload.single('file'), async (req, res, next) => {
 
     console.log(`Inserted ${allWebsites.length} websites`);
 
-    // Enqueue jobs
-    console.log('Enqueueing jobs...');
-    const JOB_CHUNK_SIZE = 100;
-    let enqueuedCount = 0;
-
-    for (let i = 0; i < allWebsites.length; i += JOB_CHUNK_SIZE) {
-      const chunk = allWebsites.slice(i, i + JOB_CHUNK_SIZE);
-      const jobPromises = chunk.map(website =>
-        enqueueJob(QUEUE_NAMES.CLASSIFY_WEBSITE, {
-          website_id: website.id,
-          batch_id: batch.id,
-          url: website.url,
-          prompt_id: prompt_id || null,
-        })
-      );
-
-      await Promise.all(jobPromises);
-      enqueuedCount += chunk.length;
-    }
-
-    console.log(`Enqueued ${enqueuedCount} jobs`);
-
-    // Update batch status to processing
+    // Update batch status to processing immediately
     await pool.query(
       `UPDATE batches SET status = 'processing', updated_at = NOW() WHERE id = $1`,
       [batch.id]
     );
 
+    // Respond immediately to avoid timeout
     res.status(201).json({
       batch,
       websites_count: allWebsites.length,
-      message: `Batch created with ${allWebsites.length} websites and all jobs enqueued`,
+      message: `Batch created with ${allWebsites.length} websites. Jobs are being enqueued in the background.`,
+    });
+
+    // Enqueue jobs in the background (don't await)
+    console.log('Enqueueing jobs in background...');
+    const JOB_CHUNK_SIZE = 100;
+
+    setImmediate(async () => {
+      try {
+        let enqueuedCount = 0;
+        for (let i = 0; i < allWebsites.length; i += JOB_CHUNK_SIZE) {
+          const chunk = allWebsites.slice(i, i + JOB_CHUNK_SIZE);
+          const jobPromises = chunk.map(website =>
+            enqueueJob(QUEUE_NAMES.CLASSIFY_WEBSITE, {
+              website_id: website.id,
+              batch_id: batch.id,
+              url: website.url,
+              prompt_id: prompt_id || null,
+            })
+          );
+
+          await Promise.all(jobPromises);
+          enqueuedCount += chunk.length;
+
+          if (enqueuedCount % 1000 === 0) {
+            console.log(`Enqueued ${enqueuedCount}/${allWebsites.length} jobs`);
+          }
+        }
+        console.log(`✅ All ${enqueuedCount} jobs enqueued successfully`);
+      } catch (error) {
+        console.error('❌ Error enqueueing jobs in background:', error);
+      }
     });
   } catch (error) {
     console.error('Error creating batch:', error);
